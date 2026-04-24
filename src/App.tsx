@@ -1,4 +1,11 @@
+import { PdfUpload } from "./components/PdfUpload";
+import type { PatientData } from "./types";
+
 function App() {
+  const handleParsed = (data: PatientData) => {
+    console.log("Parsed lab PDF", data);
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-16 text-white">
       <section className="mx-auto flex max-w-4xl flex-col gap-4">
@@ -12,6 +19,9 @@ function App() {
           Upload bloodwork PDFs, extract structured lab readings with Claude,
           and visualize long-term trends across doctors and years.
         </p>
+        <div className="pt-8">
+          <PdfUpload onParsed={handleParsed} />
+        </div>
       </section>
     </main>
   );
