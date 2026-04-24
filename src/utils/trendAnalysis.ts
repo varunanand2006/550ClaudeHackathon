@@ -1,46 +1,55 @@
-import type { LabReport, BiomarkerSeries, TrendInsight, TrendStatus } from '../types/lab';
+import type { PatientData, LabReading } from '../types';
+import type { BiomarkerSeries, TrendInsight, TrendStatus } from '../types/lab';
 
-export function aggregateBiomarkers(reports: LabReport[]): BiomarkerSeries[] {
+export function aggregateBiomarkers(patient: PatientData): BiomarkerSeries[] {
   const map = new Map<string, BiomarkerSeries>();
 
-  const sorted = [...reports].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...patient.readings].sort((a, b) => a.date.localeCompare(b.date));
 
-  for (const report of sorted) {
-    for (const result of report.results) {
-      if (!map.has(result.test_name)) {
-        map.set(result.test_name, {
-          name: result.test_name,
-          unit: result.unit,
-          reference_range: result.reference_range,
-          dataPoints: [],
-          trend: 'unknown',
-          trendPercent: 0,
-          latestValue: result.value,
-          latestDate: result.date,
-        });
-      }
-      const series = map.get(result.test_name)!;
-      series.dataPoints.push({ date: result.date, value: result.value });
-      if (result.date >= series.latestDate) {
-        series.latestValue = result.value;
-        series.latestDate = result.date;
-      }
+  for (const r of sorted) {
+    const low  = r.referenceLow  ?? 0;
+    const high = r.referenceHigh ?? 9999;
+
+    if (!map.has(r.testName)) {
+      map.set(r.testName, {
+        name: r.testName,
+        unit: r.unit,
+        reference_range: { low, high },
+        dataPoints: [],
+        trend: 'unknown',
+        trendPercent: 0,
+        latestValue: r.value,
+        latestDate: r.date,
+      });
+    }
+
+    const series = map.get(r.testName)!;
+    series.dataPoints.push({ date: r.date, value: r.value });
+    if (r.date >= series.latestDate) {
+      series.latestValue = r.value;
+      series.latestDate  = r.date;
+      // keep reference range from the most recent reading
+      series.reference_range = { low, high };
     }
   }
 
   for (const series of map.values()) {
     if (series.dataPoints.length >= 2) {
       const first = series.dataPoints[0].value;
-      const last = series.dataPoints[series.dataPoints.length - 1].value;
+      const last  = series.dataPoints[series.dataPoints.length - 1].value;
       series.trendPercent = Math.round(((last - first) / first) * 100);
       series.trend = classifyTrend(series);
     }
   }
 
+  const ORDER = [
+    'LDL Cholesterol', 'Total Cholesterol', 'Hemoglobin A1C', 'Triglycerides',
+    'HDL Cholesterol', 'Vitamin D, 25-Hydroxy', 'TSH', 'Glucose',
+  ];
+
   return Array.from(map.values()).sort((a, b) => {
-    const order = ['LDL Cholesterol', 'Total Cholesterol', 'HbA1c', 'Triglycerides', 'HDL Cholesterol', 'Vitamin D', 'TSH'];
-    const ai = order.indexOf(a.name);
-    const bi = order.indexOf(b.name);
+    const ai = ORDER.indexOf(a.name);
+    const bi = ORDER.indexOf(b.name);
     if (ai !== -1 && bi !== -1) return ai - bi;
     if (ai !== -1) return -1;
     if (bi !== -1) return 1;
@@ -51,22 +60,25 @@ export function aggregateBiomarkers(reports: LabReport[]): BiomarkerSeries[] {
 function classifyTrend(series: BiomarkerSeries): TrendStatus {
   const { low, high } = series.reference_range;
   const latest = series.latestValue;
-  const pct = series.trendPercent;
+  const pct    = series.trendPercent;
+  const hasLow  = low  > 0;
+  const hasHigh = high < 9999;
 
-  // Outside range = at least concerning
-  const outOfRange = latest < low || latest > high;
+  const tooHigh = hasHigh && latest > high;
+  const tooLow  = hasLow  && latest < low;
 
-  // HDL is "higher is better" — flip the logic
-  const isInverseMarker = series.name.toLowerCase().includes('hdl');
+  const isInverseMarker = series.name.toLowerCase().includes('hdl') ||
+                          series.name.toLowerCase().includes('vitamin d');
 
   if (isInverseMarker) {
-    if (latest < low) return pct <= -10 ? 'critical' : 'concerning';
+    if (tooLow && pct <= -10) return 'critical';
+    if (tooLow)               return 'concerning';
     return pct >= 5 ? 'improving' : 'stable';
   }
 
-  if (outOfRange && Math.abs(pct) >= 15) return 'critical';
-  if (outOfRange) return 'concerning';
-  if (pct >= 15) return 'concerning';   // trending toward out-of-range
+  if ((tooHigh || tooLow) && Math.abs(pct) >= 15) return 'critical';
+  if (tooHigh || tooLow)                           return 'concerning';
+  if (pct >= 15)  return 'concerning';
   if (pct <= -10) return 'improving';
   return 'stable';
 }
@@ -78,55 +90,61 @@ export function generateInsights(biomarkers: BiomarkerSeries[]): TrendInsight[] 
     if (b.dataPoints.length < 2) continue;
 
     const { low, high } = b.reference_range;
-    const latest = b.latestValue;
-    const absPct = Math.abs(b.trendPercent);
+    const hasLow  = low  > 0;
+    const hasHigh = high < 9999;
+    const latest  = b.latestValue;
+    const absPct  = Math.abs(b.trendPercent);
     const direction = b.trendPercent > 0 ? 'risen' : 'fallen';
-    const years = yearSpan(b.dataPoints[0].date, b.dataPoints[b.dataPoints.length - 1].date);
-    const span = years < 1 ? 'recent readings' : `${years} year${years !== 1 ? 's' : ''}`;
+    const years  = yearSpan(b.dataPoints[0].date, b.dataPoints[b.dataPoints.length - 1].date);
+    const span   = years < 1 ? 'recent readings' : `${years} year${years !== 1 ? 's' : ''}`;
+    const rangeStr = hasLow && hasHigh ? `${low}–${high} ${b.unit}`
+                   : hasHigh ? `<${high} ${b.unit}`
+                   : hasLow  ? `>${low} ${b.unit}`
+                   : '';
 
     if (b.trend === 'critical') {
       insights.push({
         biomarker: b.name,
         summary: `${b.name} has ${direction} ${absPct}% over ${span} and is now outside normal range`,
-        detail: `Current: ${latest} ${b.unit} (normal: ${low}–${high} ${b.unit}). This trend warrants attention.`,
+        detail: `Current: ${latest} ${b.unit}${rangeStr ? ` (normal: ${rangeStr})` : ''}. This trend warrants attention.`,
         severity: 'critical',
       });
     } else if (b.trend === 'concerning') {
-      const msg = latest > high
+      const msg = (hasHigh && latest > high)
         ? `${b.name} is above the normal range at ${latest} ${b.unit}`
-        : latest < low
+        : (hasLow && latest < low)
         ? `${b.name} is below the normal range at ${latest} ${b.unit}`
         : `${b.name} has ${direction} ${absPct}% over ${span}`;
       insights.push({
         biomarker: b.name,
         summary: msg,
-        detail: `Normal range: ${low}–${high} ${b.unit}. Consistently ${direction === 'risen' ? 'rising' : 'falling'} over ${span}.`,
+        detail: `${rangeStr ? `Normal range: ${rangeStr}. ` : ''}Consistently ${direction === 'risen' ? 'rising' : 'falling'} over ${span}.`,
         severity: 'warning',
       });
     } else if (b.trend === 'improving' && absPct >= 10) {
       insights.push({
         biomarker: b.name,
         summary: `${b.name} has improved ${absPct}% over ${span}`,
-        detail: `Current: ${latest} ${b.unit} — within normal range (${low}–${high} ${b.unit}).`,
+        detail: `Current: ${latest} ${b.unit}${rangeStr ? ` — within normal range (${rangeStr})` : ''}.`,
         severity: 'info',
       });
-    } else if (isConsistentlyLow(b)) {
+    } else if (isConsistentlyOutOfRange(b)) {
       insights.push({
         biomarker: b.name,
-        summary: `${b.name} consistently below normal across ${b.dataPoints.length} readings`,
-        detail: `All readings below ${low} ${b.unit}. Current: ${latest} ${b.unit}.`,
+        summary: `${b.name} consistently outside normal range across ${b.dataPoints.length} readings`,
+        detail: `All readings outside normal${rangeStr ? ` (${rangeStr})` : ''}. Current: ${latest} ${b.unit}.`,
         severity: 'warning',
       });
     }
   }
 
-  // Sort: critical first, then warning, then info
-  const order = { critical: 0, warning: 1, info: 2 };
+  const order: Record<TrendInsight['severity'], number> = { critical: 0, warning: 1, info: 2 };
   return insights.sort((a, b) => order[a.severity] - order[b.severity]);
 }
 
-function isConsistentlyLow(b: BiomarkerSeries): boolean {
-  return b.dataPoints.every(p => p.value < b.reference_range.low);
+function isConsistentlyOutOfRange(b: BiomarkerSeries): boolean {
+  const { low, high } = b.reference_range;
+  return b.dataPoints.every(p => p.value < low || p.value > high);
 }
 
 function yearSpan(dateA: string, dateB: string): number {
@@ -149,3 +167,15 @@ export const TREND_LABEL: Record<TrendStatus, string> = {
   critical:  'Action needed',
   unknown:   'Insufficient data',
 };
+
+// Adapter: converts PatientData to the shape ChartsPanel / Person B may need
+export function readingsByMarker(patient: PatientData): Record<string, LabReading[]> {
+  const out: Record<string, LabReading[]> = {};
+  for (const r of patient.readings) {
+    (out[r.testName] ??= []).push(r);
+  }
+  for (const arr of Object.values(out)) {
+    arr.sort((a, b) => a.date.localeCompare(b.date));
+  }
+  return out;
+}

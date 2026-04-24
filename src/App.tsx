@@ -1,52 +1,99 @@
-<<<<<<< HEAD
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Layout } from './components/Layout';
 import { EmptyState } from './components/EmptyState';
 import { LoadingState } from './components/LoadingState';
 import { InsightsPanel } from './components/InsightsPanel';
-import { Dashboard } from './components/Dashboard';
-import { ChartDetail } from './components/ChartDetail';
-import { UploadZone } from './components/UploadZone';
-import { MOCK_REPORTS } from './data/mockData';
+import { ChartsPanel } from './components/ChartsPanel';
+import { PdfUpload } from './components/PdfUpload';
+import { samplePatient } from './mockData';
 import { aggregateBiomarkers, generateInsights } from './utils/trendAnalysis';
-import type { LabReport, BiomarkerSeries, TrendInsight } from './types/lab';
+import { generateNarrative } from './utils/claudeNarrative';
+import type { PatientData } from './types';
 
 type Tab = 'dashboard' | 'upload' | 'insights';
 
+function mergePatient(current: PatientData, incoming: PatientData): PatientData {
+  // If we're on the demo data, replace entirely with the first real upload
+  if (current === samplePatient) {
+    return { ...incoming, readings: [...incoming.readings].sort((a, b) => a.date.localeCompare(b.date)) };
+  }
+  // Otherwise deduplicate by testName+date and merge
+  const key = (r: PatientData['readings'][number]) => `${r.testName}::${r.date}`;
+  const byKey = new Map(current.readings.map(r => [key(r), r]));
+  incoming.readings.forEach(r => byKey.set(key(r), r));
+  const name = incoming.patientName.trim() && incoming.patientName !== 'Unknown'
+    ? incoming.patientName : current.patientName;
+  return {
+    patientName: name,
+    readings: Array.from(byKey.values()).sort((a, b) => a.date.localeCompare(b.date)),
+  };
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
-  const [reports, setReports] = useState<LabReport[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedBiomarker, setSelectedBiomarker] = useState<string | null>(null);
+  const [patient, setPatient] = useState<PatientData>(samplePatient);
+  const [isLoading] = useState(false);
+  const [narrative, setNarrative] = useState<string | null>(null);
+  const [narrativeLoading, setNarrativeLoading] = useState(false);
+  const narrativeFetchedFor = useRef<number>(0);
 
-  const biomarkers: BiomarkerSeries[] = aggregateBiomarkers(reports);
-  const insights: TrendInsight[] = generateInsights(biomarkers);
+  const biomarkers = aggregateBiomarkers(patient);
+  const insights   = generateInsights(biomarkers);
+  const hasRealData = patient !== samplePatient;
+
+  // Trigger narrative when patient data changes and API key is available
+  useEffect(() => {
+    const count = patient.readings.length;
+    if (count === 0 || count === narrativeFetchedFor.current) return;
+    if (!import.meta.env.VITE_ANTHROPIC_API_KEY) return;
+
+    narrativeFetchedFor.current = count;
+    setNarrative(null);
+    setNarrativeLoading(true);
+    const bio = aggregateBiomarkers(patient);
+    const ins = generateInsights(bio);
+    generateNarrative(patient, bio, ins)
+      .then(text => setNarrative(text))
+      .catch(() => setNarrative(null))
+      .finally(() => setNarrativeLoading(false));
+  }, [patient]);
 
   function handleLoadDemo() {
-    setReports(MOCK_REPORTS);
-    setTab('dashboard');
+    setPatient(samplePatient);
+    setTab('insights');
   }
 
-  function handleReportParsed(report: LabReport) {
-    setReports(prev => [...prev, report]);
-    setTab('dashboard');
+  function handleParsed(data: PatientData) {
+    setPatient(prev => mergePatient(prev, data));
+    setTab('insights');
   }
-
-  const hasData = reports.length > 0;
-  const selected = selectedBiomarker ? biomarkers.find(b => b.name === selectedBiomarker) : null;
 
   return (
-    <Layout activeTab={tab} onTabChange={setTab} reportCount={reports.length}>
+    <Layout activeTab={tab} onTabChange={setTab} reportCount={patient.readings.length}>
       {isLoading && <LoadingState />}
 
       {!isLoading && tab === 'dashboard' && (
         <>
-          {!hasData ? (
-            <EmptyState onLoadDemo={handleLoadDemo} onGoToUpload={() => setTab('upload')} />
-          ) : selected ? (
-            <ChartDetail biomarker={selected} onBack={() => setSelectedBiomarker(null)} />
+          {!hasRealData && patient === samplePatient ? (
+            // Show charts on demo data too — just with a subtle indicator
+            <div>
+              <div style={{
+                marginBottom: 16, padding: '10px 14px',
+                background: '#1c1f2e', border: '1px solid #2d3561',
+                borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{ fontSize: 12, color: '#818cf8' }}>Demo data — Sarah Chen</span>
+                <button
+                  onClick={() => setTab('upload')}
+                  style={{ marginLeft: 'auto', fontSize: 12, color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  Upload your own →
+                </button>
+              </div>
+              <ChartsPanel patient={patient} />
+            </div>
           ) : (
-            <Dashboard biomarkers={biomarkers} onSelectBiomarker={setSelectedBiomarker} />
+            <ChartsPanel patient={patient} />
           )}
         </>
       )}
@@ -59,124 +106,46 @@ export default function App() {
               Drop any bloodwork PDF — Quest, LabCorp, hospital portals. Claude will extract the values.
             </p>
           </div>
-          <UploadZone onReportParsed={handleReportParsed} onLoadingChange={setIsLoading} />
-          {!hasData && (
-            <div style={{ marginTop: 24, textAlign: 'center' }}>
-              <span style={{ fontSize: 13, color: '#4b5563' }}>No PDFs yet? </span>
-              <button
-                onClick={handleLoadDemo}
-                style={{ fontSize: 13, color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-              >
-                Load demo data instead
-              </button>
-            </div>
-          )}
+          <PdfUpload onParsed={handleParsed} />
+          <div style={{ marginTop: 24, textAlign: 'center' }}>
+            <span style={{ fontSize: 13, color: '#4b5563' }}>No PDFs? </span>
+            <button
+              onClick={handleLoadDemo}
+              style={{ fontSize: 13, color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Load demo data instead
+            </button>
+          </div>
         </div>
       )}
 
       {!isLoading && tab === 'insights' && (
         <div>
           <div style={{ marginBottom: 24 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f9fafb', marginBottom: 6 }}>Trend Insights</h1>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f9fafb', marginBottom: 6 }}>
+              Trend Insights
+              {patient.patientName && (
+                <span style={{ fontSize: 14, fontWeight: 400, color: '#6b7280', marginLeft: 10 }}>
+                  {patient.patientName}
+                </span>
+              )}
+            </h1>
             <p style={{ fontSize: 14, color: '#6b7280' }}>
               What's actually changing in your bloodwork over time.
             </p>
           </div>
-          {!hasData ? (
+          {biomarkers.length === 0 ? (
             <EmptyState onLoadDemo={handleLoadDemo} onGoToUpload={() => setTab('upload')} />
           ) : (
-            <InsightsPanel insights={insights} biomarkers={biomarkers} />
+            <InsightsPanel
+              insights={insights}
+              biomarkers={biomarkers}
+              narrative={narrative}
+              narrativeLoading={narrativeLoading}
+            />
           )}
         </div>
       )}
     </Layout>
-=======
-import { useState } from "react";
-import { ChartsPanel } from "./components/ChartsPanel";
-import { PdfUpload } from "./components/PdfUpload";
-import { samplePatient } from "./mockData";
-import type { LabReading, PatientData } from "./types";
-
-export type CurrentPatientState = PatientData;
-
-function sortReadingsByDate(a: LabReading, b: LabReading) {
-  return a.date.localeCompare(b.date) || a.testName.localeCompare(b.testName);
-}
-
-function readingKey(reading: LabReading) {
-  return `${reading.testName}::${reading.date}`;
-}
-
-function mergePatientData(
-  currentPatient: PatientData,
-  newPatient: PatientData,
-): PatientData {
-  if (currentPatient === samplePatient) {
-    return {
-      ...newPatient,
-      readings: [...newPatient.readings].sort(sortReadingsByDate),
-    };
-  }
-
-  const readingsByKey = new Map<string, LabReading>();
-
-  currentPatient.readings.forEach((reading) => {
-    readingsByKey.set(readingKey(reading), reading);
-  });
-
-  newPatient.readings.forEach((reading) => {
-    readingsByKey.set(readingKey(reading), reading);
-  });
-
-  const newPatientName = newPatient.patientName.trim();
-
-  return {
-    patientName:
-      newPatientName && newPatientName !== "Unknown"
-        ? newPatient.patientName
-        : currentPatient.patientName,
-    readings: Array.from(readingsByKey.values()).sort(sortReadingsByDate),
-  };
-}
-
-function App() {
-  const [patient, setPatient] = useState<PatientData>(samplePatient);
-
-  const handleParsed = (data: PatientData) => {
-    console.log("Parsed lab PDF", data);
-    setPatient((currentPatient) => mergePatientData(currentPatient, data));
-  };
-
-  return (
-    <main className="min-h-screen bg-slate-950 px-6 py-16 text-white">
-      <section className="mx-auto flex max-w-4xl flex-col gap-4">
-        <p className="text-sm font-semibold uppercase tracking-wide text-cyan-300">
-          Hackathon prototype
-        </p>
-        <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-          Lab Trend Tracker
-        </h1>
-        <p className="max-w-2xl text-lg leading-8 text-slate-300">
-          Upload bloodwork PDFs, extract structured lab readings with Claude,
-          and visualize long-term trends across doctors and years.
-        </p>
-        <div className="flex flex-wrap gap-3 pt-4">
-          <button
-            type="button"
-            className="rounded-md border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-cyan-300 hover:text-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950"
-            onClick={() => setPatient(samplePatient)}
-          >
-            Reset to demo data
-          </button>
-        </div>
-        <div className="pt-6">
-          <PdfUpload onParsed={handleParsed} />
-        </div>
-        <div className="pt-6">
-          <ChartsPanel patient={patient} />
-        </div>
-      </section>
-    </main>
->>>>>>> 156d195 (Add multi-file merge logic and demo fallback)
   );
 }
