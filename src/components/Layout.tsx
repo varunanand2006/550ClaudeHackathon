@@ -1,5 +1,3 @@
-import { Activity } from 'lucide-react';
-
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: 'dashboard' | 'upload' | 'insights';
@@ -7,77 +5,102 @@ interface LayoutProps {
   reportCount: number;
 }
 
+const tabs = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'upload', label: 'Upload Labs' },
+  { id: 'insights', label: 'Insights' },
+] as const;
+
+const sideNav = [
+  { label: 'Overview', tab: 'dashboard' },
+  { label: 'Biomarkers', tab: 'dashboard' },
+  { label: 'Insights', tab: 'insights' },
+] as const;
+
 export function Layout({ children, activeTab, onTabChange, reportCount }: LayoutProps) {
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#030712' }}>
-      {/* Header */}
-      <header style={{ borderBottom: '1px solid #1f2937' }}>
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div style={{ background: '#1d4ed8', borderRadius: 10, padding: 8 }}>
-              <Activity size={20} color="#fff" />
-            </div>
-            <div>
-              <span style={{ fontSize: 18, fontWeight: 700, color: '#f9fafb', letterSpacing: '-0.3px' }}>
-                LabTrends
+    <div className="flex min-h-screen flex-col bg-ink font-sans text-white">
+      <header className="sticky top-0 z-50 border-b border-border bg-ink/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center justify-between gap-6">
+            <button
+              className="font-serif text-xl font-semibold tracking-tight text-white"
+              onClick={() => onTabChange('dashboard')}
+              type="button"
+            >
+              ✱ Lab Trend Tracker
+            </button>
+
+            {reportCount > 0 ? (
+              <span className="rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent lg:hidden">
+                {reportCount} readings
               </span>
-              <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 8 }}>
-                Bloodwork over time
-              </span>
-            </div>
+            ) : null}
           </div>
 
-          {reportCount > 0 && (
-            <span style={{
-              background: '#1e3a5f',
-              color: '#60a5fa',
-              fontSize: 12,
-              padding: '3px 10px',
-              borderRadius: 20,
-              fontWeight: 500,
-            }}>
-              {reportCount} report{reportCount !== 1 ? 's' : ''} loaded
-            </span>
-          )}
-        </div>
+          <div className="flex items-center justify-between gap-6">
+            <nav className="flex gap-7">
+              {tabs.map((tab) => {
+                const active = activeTab === tab.id;
 
-        {/* Nav tabs */}
-        <div className="max-w-6xl mx-auto px-6">
-          <nav className="flex gap-1" style={{ marginBottom: -1 }}>
-            {(['dashboard', 'upload', 'insights'] as const).map((tab) => {
-              const labels = { dashboard: 'Dashboard', upload: 'Upload Labs', insights: 'Insights' };
-              const active = activeTab === tab;
-              return (
-                <button
-                  key={tab}
-                  onClick={() => onTabChange(tab)}
-                  style={{
-                    padding: '10px 16px',
-                    fontSize: 14,
-                    fontWeight: active ? 600 : 400,
-                    color: active ? '#f9fafb' : '#6b7280',
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'color 0.15s',
-                  }}
-                >
-                  {labels[tab]}
-                </button>
-              );
-            })}
-          </nav>
+                return (
+                  <button
+                    className={`border-b py-2 text-sm transition ${
+                      active
+                        ? 'border-accent text-white'
+                        : 'border-transparent text-muted-text hover:text-white'
+                    }`}
+                    key={tab.id}
+                    onClick={() => onTabChange(tab.id)}
+                    type="button"
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
+
+            {reportCount > 0 ? (
+              <span className="hidden rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-xs font-medium text-accent lg:inline-flex">
+                {reportCount} readings
+              </span>
+            ) : null}
+          </div>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
-        {children}
-      </main>
+      <div className="mx-auto flex w-full max-w-7xl flex-1">
+        <aside className="hidden w-44 shrink-0 px-6 py-10 lg:block">
+          <div className="sticky top-28 flex flex-col gap-4">
+            {sideNav.map((item) => {
+              const active =
+                activeTab === item.tab &&
+                (item.label !== 'Biomarkers' || activeTab === 'dashboard');
 
-      <footer style={{ borderTop: '1px solid #1f2937', padding: '16px 24px', textAlign: 'center' }}>
-        <span style={{ fontSize: 12, color: '#374151' }}>
+              return (
+                <div
+                  className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.28em]"
+                  key={item.label}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      active ? 'bg-accent' : 'bg-white/15'
+                    }`}
+                  />
+                  <span className={active ? 'text-white' : 'text-muted-text'}>
+                    {item.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </aside>
+
+        <main className="min-w-0 flex-1 px-6 py-8 lg:px-8">{children}</main>
+      </div>
+
+      <footer className="border-t border-border px-6 py-5 text-center">
+        <span className="text-xs text-neutral-700">
           LabTrends — patterns in your health data over time
         </span>
       </footer>

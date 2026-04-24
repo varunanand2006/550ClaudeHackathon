@@ -1,15 +1,31 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* TODO: replace with painterly hero image, see public/hero-bg.jpg */
+  --hero-bg-image: url("https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1920");
+}
 
 @layer base {
   body {
     margin: 0;
-    background: #030712;
-    color: #f9fafb;
-    font-family: system-ui, -apple-system, sans-serif;
+    background: #050505;
+    color: #fff;
+    font-family: "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 
   #root {
     min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .display-serif {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 0.95;
   }
 }

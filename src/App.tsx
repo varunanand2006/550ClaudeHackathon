@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Layout } from './components/Layout';
 import { EmptyState } from './components/EmptyState';
+import { LandingHero } from './components/LandingHero';
 import { LoadingState } from './components/LoadingState';
 import { InsightsPanel } from './components/InsightsPanel';
-import { ChartsPanel } from './components/ChartsPanel';
+import { Dashboard } from './components/Dashboard';
+import { ChartDetail } from './components/ChartDetail';
 import { PdfUpload } from './components/PdfUpload';
 import { samplePatient } from './mockData';
 import { aggregateBiomarkers, generateInsights } from './utils/trendAnalysis';
@@ -33,13 +35,19 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [patient, setPatient] = useState<PatientData>(samplePatient);
   const [isLoading] = useState(false);
+  const [demoLoaded, setDemoLoaded] = useState(false);
   const [narrative, setNarrative] = useState<string | null>(null);
   const [narrativeLoading, setNarrativeLoading] = useState(false);
+  const [selectedBiomarker, setSelectedBiomarker] = useState<string | null>(null);
   const narrativeFetchedFor = useRef<number>(0);
 
   const biomarkers = aggregateBiomarkers(patient);
   const insights   = generateInsights(biomarkers);
   const hasRealData = patient !== samplePatient;
+  const hasLoadedData = hasRealData || demoLoaded;
+  const selected = selectedBiomarker
+    ? biomarkers.find((b) => b.name === selectedBiomarker) ?? null
+    : null;
 
   // Trigger narrative when patient data changes and API key is available
   useEffect(() => {
@@ -60,58 +68,67 @@ export default function App() {
 
   function handleLoadDemo() {
     setPatient(samplePatient);
-    setTab('insights');
+    setDemoLoaded(true);
+    setSelectedBiomarker(null);
+    setTab('dashboard');
   }
 
   function handleParsed(data: PatientData) {
     setPatient(prev => mergePatient(prev, data));
+    setDemoLoaded(true);
+    setSelectedBiomarker(null);
     setTab('insights');
   }
 
   return (
-    <Layout activeTab={tab} onTabChange={setTab} reportCount={patient.readings.length}>
+    <Layout
+      activeTab={tab}
+      onTabChange={setTab}
+      reportCount={hasLoadedData ? patient.readings.length : 0}
+    >
       {isLoading && <LoadingState />}
 
       {!isLoading && tab === 'dashboard' && (
         <>
-          {!hasRealData && patient === samplePatient ? (
-            // Show charts on demo data too — just with a subtle indicator
-            <div>
-              <div style={{
-                marginBottom: 16, padding: '10px 14px',
-                background: '#1c1f2e', border: '1px solid #2d3561',
-                borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{ fontSize: 12, color: '#818cf8' }}>Demo data — Sarah Chen</span>
-                <button
-                  onClick={() => setTab('upload')}
-                  style={{ marginLeft: 'auto', fontSize: 12, color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer' }}
-                >
-                  Upload your own →
-                </button>
-              </div>
-              <ChartsPanel patient={patient} />
-            </div>
+          {!hasLoadedData ? (
+            <LandingHero
+              onGoToUpload={() => setTab('upload')}
+              onLoadDemo={handleLoadDemo}
+            />
+          ) : selected ? (
+            <ChartDetail
+              biomarker={selected}
+              onBack={() => setSelectedBiomarker(null)}
+            />
           ) : (
-            <ChartsPanel patient={patient} />
+            <Dashboard
+              biomarkers={biomarkers}
+              onSelectBiomarker={setSelectedBiomarker}
+            />
           )}
         </>
       )}
 
       {!isLoading && tab === 'upload' && (
         <div>
-          <div style={{ marginBottom: 24 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f9fafb', marginBottom: 6 }}>Upload Lab Results</h1>
-            <p style={{ fontSize: 14, color: '#6b7280' }}>
+          <div className="mb-8">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-accent">
+              Upload
+            </p>
+            <h1 className="font-serif text-4xl font-semibold text-white">
+              Upload Lab Results
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-text">
               Drop any bloodwork PDF — Quest, LabCorp, hospital portals. Claude will extract the values.
             </p>
           </div>
           <PdfUpload onParsed={handleParsed} />
-          <div style={{ marginTop: 24, textAlign: 'center' }}>
-            <span style={{ fontSize: 13, color: '#4b5563' }}>No PDFs? </span>
+          <div className="mt-8 text-center">
+            <span className="text-sm text-muted-text">No PDFs? </span>
             <button
+              className="text-sm font-medium text-accent underline underline-offset-4"
               onClick={handleLoadDemo}
-              style={{ fontSize: 13, color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+              type="button"
             >
               Load demo data instead
             </button>
@@ -121,20 +138,23 @@ export default function App() {
 
       {!isLoading && tab === 'insights' && (
         <div>
-          <div style={{ marginBottom: 24 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f9fafb', marginBottom: 6 }}>
+          <div className="mb-8">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-accent">
+              Intelligence
+            </p>
+            <h1 className="font-serif text-4xl font-semibold text-white">
               Trend Insights
               {patient.patientName && (
-                <span style={{ fontSize: 14, fontWeight: 400, color: '#6b7280', marginLeft: 10 }}>
+                <span className="ml-3 font-sans text-sm font-normal text-muted-text">
                   {patient.patientName}
                 </span>
               )}
             </h1>
-            <p style={{ fontSize: 14, color: '#6b7280' }}>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-text">
               What's actually changing in your bloodwork over time.
             </p>
           </div>
-          {biomarkers.length === 0 ? (
+          {!hasLoadedData || biomarkers.length === 0 ? (
             <EmptyState onLoadDemo={handleLoadDemo} onGoToUpload={() => setTab('upload')} />
           ) : (
             <InsightsPanel

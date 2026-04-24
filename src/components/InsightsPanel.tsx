@@ -1,6 +1,13 @@
-import { AlertTriangle, TrendingUp, TrendingDown, CheckCircle, Sparkles, Loader } from 'lucide-react';
-import type { TrendInsight, BiomarkerSeries } from '../types/lab';
-import { TREND_COLOR, TREND_LABEL } from '../utils/trendAnalysis';
+import {
+  AlertTriangle,
+  CheckCircle,
+  Loader,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
+import type { BiomarkerSeries, TrendInsight } from '../types/lab';
+import { TREND_LABEL } from '../utils/trendAnalysis';
 
 interface InsightsPanelProps {
   insights: TrendInsight[];
@@ -9,233 +16,269 @@ interface InsightsPanelProps {
   narrativeLoading: boolean;
 }
 
-export function InsightsPanel({ insights, biomarkers, narrative, narrativeLoading }: InsightsPanelProps) {
+export function InsightsPanel({
+  insights,
+  biomarkers,
+  narrative,
+  narrativeLoading,
+}: InsightsPanelProps) {
   if (biomarkers.length === 0) return null;
 
-  const critical = insights.filter(i => i.severity === 'critical');
-  const warnings = insights.filter(i => i.severity === 'warning');
-  const infos    = insights.filter(i => i.severity === 'info');
+  const critical = insights.filter((i) => i.severity === 'critical');
+  const warnings = insights.filter((i) => i.severity === 'warning');
+  const infos = insights.filter((i) => i.severity === 'info');
 
   return (
-    <div className="flex flex-col gap-6">
-
-      {/* AI Narrative */}
+    <div className="space-y-8">
       {(narrativeLoading || narrative) && (
-        <div style={{
-          background: 'linear-gradient(135deg, #0f1f3d 0%, #0d1f2d 100%)',
-          border: '1px solid #1e3a5f',
-          borderRadius: 12,
-          padding: '20px 22px',
-          display: 'flex',
-          gap: 14,
-          alignItems: 'flex-start',
-        }}>
-          <div style={{
-            flexShrink: 0,
-            width: 32, height: 32,
-            background: '#1d4ed8',
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {narrativeLoading
-              ? <Loader size={15} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
-              : <Sparkles size={15} color="#fff" />
-            }
-            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-              AI Summary
+        <section className="rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/10 to-surface p-8">
+          <div className="flex gap-5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-black">
+              {narrativeLoading ? (
+                <Loader className="animate-spin" size={18} />
+              ) : (
+                <Sparkles size={18} />
+              )}
             </div>
-            {narrativeLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[100, 85, 60].map((w, i) => (
-                  <div key={i} style={{
-                    height: 12, width: `${w}%`,
-                    background: '#1e3a5f',
-                    borderRadius: 6,
-                    animation: `pulse 1.5s ease-in-out ${i * 0.2}s infinite`,
-                  }} />
-                ))}
-                <style>{`@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.8} }`}</style>
-              </div>
-            ) : (
-              <p style={{ fontSize: 14, color: '#cbd5e1', lineHeight: 1.65, margin: 0 }}>{narrative}</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Summary counts */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        <StatCard label="Action Needed" value={critical.length} color="#ef4444" bg="#1c0a0a" />
-        <StatCard label="Watch"         value={warnings.length} color="#f59e0b" bg="#1c1300" />
-        <StatCard label="Improving"     value={infos.length}    color="#22c55e" bg="#051a0a" />
-      </div>
-
-      {/* Biomarker cards with range bars */}
-      <section>
-        <h2 style={{ fontSize: 14, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-          Biomarker Status
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 10 }}>
-          {biomarkers.map(b => (
-            <BiomarkerCard key={b.name} biomarker={b} />
-          ))}
-        </div>
-      </section>
-
-      {/* Insight cards */}
-      {insights.length > 0 && (
-        <section>
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-            Trend Analysis
-          </h2>
-          <div className="flex flex-col gap-3">
-            {insights.map((insight, i) => (
-              <InsightCard key={i} insight={insight} />
-            ))}
+            <div className="min-w-0 flex-1">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-accent">
+                AI Summary
+              </p>
+              {narrativeLoading ? (
+                <div className="space-y-3">
+                  {[100, 84, 58].map((width) => (
+                    <div
+                      className="h-3 animate-pulse rounded-full bg-white/10"
+                      key={width}
+                      style={{ width: `${width}%` }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="max-w-4xl text-base leading-7 text-zinc-200">
+                  {narrative}
+                </p>
+              )}
+            </div>
           </div>
         </section>
       )}
 
-      {insights.length === 0 && (
-        <div style={{
-          padding: '24px', borderRadius: 10,
-          border: '1px solid #1f2937', background: '#0d1117',
-          textAlign: 'center', color: '#6b7280',
-        }}>
-          <CheckCircle size={28} style={{ margin: '0 auto 8px', color: '#22c55e' }} />
-          <p style={{ fontWeight: 600, color: '#d1fae5', marginBottom: 4 }}>All markers look stable</p>
-          <p style={{ fontSize: 13 }}>No significant trends detected across your results.</p>
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard label="Action Needed" tone="critical" value={critical.length} />
+        <StatCard label="Watch" tone="warning" value={warnings.length} />
+        <StatCard label="Improving" tone="info" value={infos.length} />
+      </div>
+
+      <section className="rounded-2xl border border-border bg-surface p-8">
+        <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-muted-text">
+              Biomarkers
+            </p>
+            <h2 className="font-serif text-3xl font-semibold text-white">
+              Current status
+            </h2>
+          </div>
+          <p className="text-sm text-muted-text">
+            {biomarkers.length} markers tracked across the timeline
+          </p>
         </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {biomarkers.map((biomarker) => (
+            <BiomarkerCard biomarker={biomarker} key={biomarker.name} />
+          ))}
+        </div>
+      </section>
+
+      {insights.length > 0 ? (
+        <section className="rounded-2xl border border-border bg-surface p-8">
+          <div className="mb-7">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-muted-text">
+              Pattern recognition
+            </p>
+            <h2 className="font-serif text-3xl font-semibold text-white">
+              Trend analysis
+            </h2>
+          </div>
+          <div className="space-y-4">
+            {insights.map((insight) => (
+              <InsightCard insight={insight} key={`${insight.biomarker}-${insight.summary}`} />
+            ))}
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-2xl border border-border bg-surface p-10 text-center">
+          <CheckCircle className="mx-auto mb-4 text-accent" size={36} />
+          <h2 className="font-serif text-3xl font-semibold text-white">
+            All markers look stable
+          </h2>
+          <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted-text">
+            No significant trends were detected across the uploaded results.
+          </p>
+        </section>
       )}
     </div>
   );
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
+function StatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'critical' | 'warning' | 'info';
+}) {
+  const toneClass = {
+    critical: 'border-red-400/20 bg-red-500/10 text-red-300',
+    warning: 'border-orange-300/20 bg-orange-400/10 text-orange-200',
+    info: 'border-accent/20 bg-accent/10 text-accent',
+  }[tone];
 
-function StatCard({ label, value, color, bg }: { label: string; value: number; color: string; bg: string }) {
   return (
-    <div style={{
-      background: bg, border: `1px solid ${color}33`,
-      borderRadius: 10, padding: '16px', textAlign: 'center',
-    }}>
-      <div style={{ fontSize: 32, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{label}</div>
+    <div className={`rounded-2xl border p-8 text-center ${toneClass}`}>
+      <div className="font-serif text-6xl font-semibold leading-none">{value}</div>
+      <div className="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-muted-text">
+        {label}
+      </div>
     </div>
   );
 }
 
-function BiomarkerCard({ biomarker: b }: { biomarker: BiomarkerSeries }) {
-  const color = TREND_COLOR[b.trend];
-  const label = TREND_LABEL[b.trend];
-  const { low, high } = b.reference_range;
-  const inRange = b.latestValue >= low && b.latestValue <= high;
-
-  // Range bar math — build a visual window around the reference range
-  const span = high - low;
-  const padding = span * 0.4;
-  const visMin = Math.max(0, low - padding);
-  const visMax = high + padding;
-  const clampedVal = Math.min(Math.max(b.latestValue, visMin), visMax);
-  const pct = (val: number) => ((val - visMin) / (visMax - visMin)) * 100;
-
-  const refLeft  = pct(low);
-  const refWidth = pct(high) - pct(low);
-  const dotLeft  = pct(clampedVal);
-  const overHigh = b.latestValue > visMax;
-  const underLow = b.latestValue < visMin;
+function BiomarkerCard({ biomarker }: { biomarker: BiomarkerSeries }) {
+  const label = TREND_LABEL[biomarker.trend];
+  const inRange =
+    biomarker.latestValue >= biomarker.reference_range.low &&
+    biomarker.latestValue <= biomarker.reference_range.high;
+  const range = getRangeBar(biomarker);
 
   return (
-    <div style={{
-      background: '#0d1117', border: '1px solid #1f2937',
-      borderRadius: 10, padding: '14px',
-      borderLeft: `3px solid ${color}`,
-    }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#f9fafb', marginBottom: 6 }}>{b.name}</div>
-
-      {/* Value + unit */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 10 }}>
-        <span style={{ fontSize: 22, fontWeight: 700, color: inRange ? '#f9fafb' : color }}>
-          {b.latestValue}
-        </span>
-        <span style={{ fontSize: 12, color: '#6b7280' }}>{b.unit}</span>
-        <span style={{ fontSize: 11, color: '#374151', marginLeft: 'auto' }}>
-          {low}–{high}
+    <article className="rounded-2xl border border-border bg-ink p-6">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-text">
+            {getCategory(biomarker.name)}
+          </p>
+          <h3 className="font-serif text-2xl font-semibold text-white">
+            {biomarker.name}
+          </h3>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getTrendTone(biomarker.trend)}`}>
+          {label}
         </span>
       </div>
 
-      {/* Range bar */}
-      <div style={{ position: 'relative', height: 6, background: '#1f2937', borderRadius: 3, marginBottom: 8 }}>
-        {/* Normal range band */}
-        <div style={{
-          position: 'absolute',
-          left: `${refLeft}%`,
-          width: `${refWidth}%`,
-          height: '100%',
-          background: '#16a34a44',
-          borderRadius: 3,
-        }} />
-        {/* Value dot */}
-        <div style={{
-          position: 'absolute',
-          left: `${dotLeft}%`,
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 10, height: 10,
-          background: color,
-          borderRadius: '50%',
-          border: '2px solid #0d1117',
-          boxShadow: `0 0 0 2px ${color}55`,
-        }} />
-        {/* Out-of-range arrows */}
-        {overHigh && (
-          <div style={{ position: 'absolute', right: -14, top: '50%', transform: 'translateY(-50%)', color, fontSize: 10 }}>▶</div>
-        )}
-        {underLow && (
-          <div style={{ position: 'absolute', left: -14, top: '50%', transform: 'translateY(-50%)', color, fontSize: 10 }}>◀</div>
-        )}
+      <div className="mb-5 flex items-baseline gap-2">
+        <span className={`font-serif text-5xl font-semibold ${inRange ? 'text-white' : 'text-orange-200'}`}>
+          {biomarker.latestValue}
+        </span>
+        <span className="text-sm text-muted-text">{biomarker.unit}</span>
       </div>
 
-      {/* Status row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: color }} />
-        <span style={{ fontSize: 11, color }}>{label}</span>
-        {b.dataPoints.length >= 2 && (
-          <span style={{ fontSize: 11, color: '#4b5563', marginLeft: 'auto' }}>
-            {b.trendPercent > 0 ? '+' : ''}{b.trendPercent}%
-          </span>
-        )}
+      <div className="relative mb-4 h-2 rounded-full bg-white/10">
+        <div
+          className="absolute top-0 h-full rounded-full bg-accent/20"
+          style={{ left: `${range.refLeft}%`, width: `${range.refWidth}%` }}
+        />
+        <div
+          className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink bg-accent shadow-[0_0_0_4px_rgba(79,209,197,0.16)]"
+          style={{ left: `${range.dotLeft}%` }}
+        />
       </div>
-    </div>
+
+      <div className="flex items-center justify-between text-xs text-muted-text">
+        <span>Ref {formatRange(biomarker)}</span>
+        <span>
+          {biomarker.trendPercent > 0 ? '+' : ''}
+          {biomarker.trendPercent}%
+        </span>
+      </div>
+    </article>
   );
 }
 
 function InsightCard({ insight }: { insight: TrendInsight }) {
-  const configs = {
-    critical: { icon: <AlertTriangle size={16} />, color: '#ef4444', bg: '#1c0a0a', border: '#ef444433' },
-    warning:  { icon: <TrendingUp size={16} />,    color: '#f59e0b', bg: '#1c1300', border: '#f59e0b33' },
-    info:     { icon: <TrendingDown size={16} />,  color: '#22c55e', bg: '#051a0a', border: '#22c55e33' },
-  };
-  const cfg = configs[insight.severity];
+  const cfg = {
+    critical: {
+      icon: AlertTriangle,
+      className: 'border-red-400/20 bg-red-500/10 text-red-300',
+    },
+    warning: {
+      icon: TrendingUp,
+      className: 'border-orange-300/20 bg-orange-400/10 text-orange-200',
+    },
+    info: {
+      icon: TrendingDown,
+      className: 'border-accent/20 bg-accent/10 text-accent',
+    },
+  }[insight.severity];
+  const Icon = cfg.icon;
 
   return (
-    <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 10, padding: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <span style={{ color: cfg.color, flexShrink: 0, marginTop: 2 }}>{cfg.icon}</span>
-        <div>
-          <p style={{ fontWeight: 600, color: '#f9fafb', marginBottom: 4, fontSize: 14 }}>{insight.summary}</p>
-          <p style={{ fontSize: 13, color: '#6b7280' }}>{insight.detail}</p>
+    <article className={`rounded-2xl border p-6 ${cfg.className}`}>
+      <div className="flex gap-4">
+        <Icon className="mt-1 shrink-0" size={18} />
+        <div className="min-w-0 flex-1">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <h3 className="font-serif text-2xl font-semibold text-white">
+              {insight.biomarker}
+            </h3>
+            <span className="rounded-full bg-black/25 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
+              {insight.severity}
+            </span>
+          </div>
+          <p className="text-sm font-semibold leading-6 text-white">
+            {insight.summary}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-zinc-400">
+            {insight.detail}
+          </p>
         </div>
-        <span style={{
-          marginLeft: 'auto', flexShrink: 0, fontSize: 11, color: cfg.color,
-          background: `${cfg.color}18`, padding: '2px 8px', borderRadius: 12, fontWeight: 500,
-        }}>
-          {insight.biomarker}
-        </span>
       </div>
-    </div>
+    </article>
   );
+}
+
+function getCategory(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.includes('cholesterol') || lower.includes('triglycerides')) return 'Cholesterol';
+  if (lower.includes('a1c') || lower.includes('glucose')) return 'Glucose';
+  if (lower.includes('vitamin')) return 'Nutrition';
+  if (lower.includes('tsh')) return 'Thyroid';
+  return 'Biomarker';
+}
+
+function getTrendTone(trend: BiomarkerSeries['trend']) {
+  if (trend === 'critical') return 'border-red-400/30 bg-red-500/10 text-red-300';
+  if (trend === 'concerning') return 'border-orange-300/30 bg-orange-400/10 text-orange-200';
+  if (trend === 'improving') return 'border-accent/30 bg-accent/10 text-accent';
+  return 'border-white/10 bg-white/5 text-zinc-300';
+}
+
+function getRangeBar(biomarker: BiomarkerSeries) {
+  const { low, high } = biomarker.reference_range;
+  const finiteHigh = high < 9999 ? high : Math.max(biomarker.latestValue, low) * 1.3;
+  const span = Math.max(1, finiteHigh - low);
+  const padding = span * 0.5;
+  const visMin = Math.max(0, low - padding);
+  const visMax = finiteHigh + padding;
+  const pct = (value: number) => ((value - visMin) / (visMax - visMin)) * 100;
+  const dot = Math.min(Math.max(biomarker.latestValue, visMin), visMax);
+
+  return {
+    refLeft: pct(low),
+    refWidth: Math.max(4, pct(finiteHigh) - pct(low)),
+    dotLeft: pct(dot),
+  };
+}
+
+function formatRange(biomarker: BiomarkerSeries) {
+  const { low, high } = biomarker.reference_range;
+  if (low > 0 && high < 9999) return `${low}-${high} ${biomarker.unit}`;
+  if (high < 9999) return `<${high} ${biomarker.unit}`;
+  if (low > 0) return `>${low} ${biomarker.unit}`;
+  return 'not listed';
 }
