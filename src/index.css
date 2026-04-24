@@ -1,7 +1,15 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-body {
-  margin: 0;
+@layer base {
+  body {
+    margin: 0;
+    background: #030712;
+    color: #f9fafb;
+    font-family: system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
 }
